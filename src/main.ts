@@ -7,6 +7,7 @@ const PORT = 3000;
 const app = express();
 
 app.use(morgan("dev"));
+app.use(express.static("static", { extensions: ["html"] }));
 
 app.get("/api/hello", async (req, res) => {
   res.json({
@@ -16,6 +17,13 @@ app.get("/api/hello", async (req, res) => {
 
 app.get("/api/error", async (req, res) => {
   throw new Error("Error endpoint");
+});
+
+app.post("/api/games", async (req, res) => {
+  const startedAt = new Date();
+  console.log(`startedAt: ${startedAt}`);
+
+  res.status(201).end();
 });
 
 app.use(errorHandler);
