@@ -38,12 +38,7 @@ app.get("/api/error", async (req, res) => {
 app.post("/api/games", async (req, res) => {
   const now = new Date();
 
-  const conn = await mysql.createConnection({
-    host: "localhost",
-    database: "reversi",
-    user: "reversi",
-    password: "password",
-  });
+  const conn = await connectMySQL();
   try {
     await conn.beginTransaction();
 
@@ -91,6 +86,46 @@ app.post("/api/games", async (req, res) => {
   res.status(201).end();
 });
 
+app.get("/api/games/latest/turns/:turnCount", async (req, res) => {
+  const turnCount = parseInt(req.params.turnCount);
+
+  const conn = await connectMySQL();
+
+  try {
+    const gameSelectResult = await conn.execute<mysql.RowDataPacket[]>(
+      "select id, started_at from games order by id desc limit 1",
+    );
+    const game = gameSelectResult[0][0];
+
+    const turnSelectResult = await conn.execute<mysql.RowDataPacket[]>(
+      "select id, game_id, turn_count, next_disc, end_at from turns where game_id = ? and turn_count = ?",
+      [game["id"], turnCount],
+    );
+    const turn = turnSelectResult[0][0];
+
+    const squaresSelectResult = await conn.execute<mysql.RowDataPacket[]>(
+      "select id, turn_id, x, y, disc from squares where turn_id = ?",
+      [turn["id"]],
+    );
+    const squares = squaresSelectResult[0];
+    const board = Array.from(Array(8)).map(() => Array.from(Array(8)));
+    squares.forEach((s) => {
+      board[s.y][s.x] = s.disc;
+    });
+
+    const responseBody = {
+      turnCount,
+      board,
+      nextDisc: turn["next_disc"],
+      // TODO: If the match has been settled, retrieve the data from the `game_results` table
+      winnerDisc: null,
+    };
+    res.json(responseBody);
+  } finally {
+    await conn.end();
+  }
+});
+
 app.use(errorHandler);
 
 app.listen(PORT, () => {
@@ -106,5 +141,14 @@ function errorHandler(
   console.error("Unexpected Error occured");
   res.status(500).send({
     message: "Unexpected Error occured",
+  });
+}
+
+async function connectMySQL() {
+  return await mysql.createConnection({
+    host: "localhost",
+    database: "reversi",
+    user: "reversi",
+    password: "password",
   });
 }
