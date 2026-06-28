@@ -159,12 +159,12 @@ app.post("/api/games/latest/turns", async (req, res) => {
       board[s.y][s.x] = s.disc;
     });
 
-    // Check if you can place the rock
+    //TODO: Check if you can place the rock
 
     // Place a rock
     board[y][x] = disc;
 
-    // Flip
+    //TODO: Flip
 
     // Save the turn
     const nextDisc = disc === DARK ? LIGHT : DARK;
