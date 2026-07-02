@@ -1,12 +1,15 @@
 import { connectMySQL } from "../../infrastructure/connection";
 import { GameRepository } from "../../domain/model/game/gameRepository";
-import { Disc, toDisc } from "../../domain/model/turn/disc";
+import { Disc } from "../../domain/model/turn/disc";
 import { Point } from "../../domain/model/turn/point";
 import { TurnRepository } from "../../domain/model/turn/turnRepository";
 import { ApplicationError } from "../error/applicationError";
+import { GameResultRepository } from "../../domain/model/gameResult/gameResultRepository";
+import { GameResult } from "../../domain/model/gameResult/gameResult";
 
 const turnRepository = new TurnRepository();
 const gameRepository = new GameRepository();
+const gameResultRepository = new GameResultRepository();
 
 class findLatestGameTurnByTurnCountOutput {
   constructor(
@@ -58,12 +61,16 @@ export class TurnService {
         turnCount,
       );
 
+      let gameResult: GameResult | undefined;
+      if (turn.gameEnded()) {
+        gameResult = await gameResultRepository.findForGameId(conn, game.id);
+      }
+
       return new findLatestGameTurnByTurnCountOutput(
         turnCount,
         turn.board.discs,
         turn.nextDisc,
-        // TODO: If the match has been settled, retrieve the data from the `game_results` table
-        null,
+        gameResult?.winnerDisc ?? null,
       );
     } finally {
       await conn.end();
@@ -99,7 +106,8 @@ export class TurnService {
 
       if (newTurn.gameEnded()) {
         const winnerDisc = newTurn.winnerDisc();
-              
+        const gameResult = new GameResult(game.id, winnerDisc, newTurn.endAt);
+        await gameResultRepository.save(conn, gameResult);
       }
 
       await conn.commit();

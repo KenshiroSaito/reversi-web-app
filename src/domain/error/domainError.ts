@@ -4,7 +4,8 @@ type DomainErrorType =
   | "SelectedDiscIsNotNextDisc"
   | "SpecifiedTurnNotFound"
   | "InvalidPoint"
-  | "InvalidDiscValue";
+  | "InvalidDiscValue"
+  | "InvalidWinnerDiscValue";
 
 export class DomainError extends Error {
   constructor(
