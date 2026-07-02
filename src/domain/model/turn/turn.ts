@@ -1,4 +1,5 @@
 import { DomainError } from "../../error/domainError";
+import { WinnerDisc } from "../gameResult/winnerDisc";
 import { Board, initialBoard } from "./board";
 import { Disc } from "./disc";
 import { Move } from "./move";
@@ -8,14 +9,13 @@ export class Turn {
   constructor(
     private _gameId: number,
     private _turnCount: number,
-    private _nextDisc: Disc,
+    private _nextDisc: Disc | undefined,
     private _move: Move | undefined,
     private _board: Board,
     private _endAt: Date,
   ) {}
 
   placeNext(disc: Disc, point: Point): Turn {
-    // Can't place a stone when a stone is not what it suppose to be (follow the order)
     if (disc !== this._nextDisc) {
       throw new DomainError(
         "SelectedDiscIsNotNextDisc",
@@ -27,8 +27,7 @@ export class Turn {
 
     const nextBoard = this._board.place(move);
 
-    // TODO: Skip if you can't place a stone
-    const nextDisc = disc === Disc.Dark ? Disc.Light : Disc.Dark;
+    const nextDisc = this.decideNextDisc(nextBoard, disc);
 
     return new Turn(
       this._gameId,
@@ -39,6 +38,39 @@ export class Turn {
       new Date(),
     );
   }
+
+  gameEnded(): boolean {
+    return this.nextDisc === undefined;
+  }
+
+  winnerDisc(): WinnerDisc {
+    const darkCount = this._board.count(Disc.Dark);
+    const lightCount = this._board.count(Disc.Light);
+
+    if (darkCount === lightCount) {
+      return WinnerDisc.Draw;
+    } else if (darkCount > lightCount) {
+      return WinnerDisc.Dark;
+    } else {
+      return WinnerDisc.Light;
+    }
+  }
+
+  private decideNextDisc(board: Board, previousDisc: Disc): Disc | undefined {
+    const existDarkValidMove = board.existValidMove(Disc.Dark);
+    const existLightValidMove = board.existValidMove(Disc.Light);
+
+    if (existDarkValidMove && existLightValidMove) {
+      return previousDisc === Disc.Dark ? Disc.Light : Disc.Dark;
+    } else if (!existDarkValidMove && !existLightValidMove) {
+      return undefined;
+    } else if (existDarkValidMove) {
+      return Disc.Dark;
+    } else {
+      return Disc.Light;
+    }
+  }
+
   get gameId() {
     return this._gameId;
   }

@@ -10,32 +10,26 @@ export class Board {
   }
 
   place(move: Move): Board {
-    // You can't place a stone unless its the empty square
     if (this._discs[move.point.y][move.point.x] !== Disc.Emoty) {
       throw new DomainError(
         "SelectedPointIsNotEmpty",
         "Select point is not empty",
       );
     }
-    // List the reversible point
     const flipPoints = this.listFlipPoints(move);
 
-    // Can't place a stone if there's no reversible point
     if (flipPoints.length === 0) {
       throw new DomainError("FlipPointsIsEmpty", "Flip points is empty");
     }
 
-    // Copy the board
     const newDiscs = this._discs.map((line) => {
       return line.map((disc) => {
         return disc;
       });
     });
 
-    // Place a stone
     newDiscs[move.point.y][move.point.x] = move.disc;
 
-    // Reverse
     flipPoints.forEach((p) => {
       newDiscs[p.y][p.x] = move.disc;
     });
@@ -52,17 +46,13 @@ export class Board {
     const checkFlipPoints = (xMove: number, yMove: number) => {
       const flipCandidate: Point[] = [];
 
-      // Start at the position where you moved 1 square
       let cursorX = walledX + xMove;
       let cursorY = walledY + yMove;
 
-      // Check each stone while there's opposite color
       while (isOppositeDisc(move.disc, this._walledDiscs[cursorY][cursorX])) {
-        // Subtract 1 to account for the sentry
         flipCandidate.push(new Point(cursorX - 1, cursorY - 1));
         cursorX += xMove;
         cursorY += yMove;
-        // The stone to be flipped is determined if next color is the same color
         if (move.disc === this._walledDiscs[cursorY][cursorX]) {
           flipPoints.push(...flipCandidate);
           break;
@@ -88,6 +78,37 @@ export class Board {
     checkFlipPoints(1, -1);
 
     return flipPoints;
+  }
+
+  existValidMove(disc: Disc): boolean {
+    for (let y = 0; y < this._discs.length; y++) {
+      const line = this._discs[y];
+
+      for (let x = 0; x < line.length; x++) {
+        const discOnBoard = line[x];
+
+        if (discOnBoard !== Disc.Emoty) {
+          continue;
+        }
+
+        const move = new Move(disc, new Point(x, y));
+        const flipPoints = this.listFlipPoints(move);
+
+        if (flipPoints.length !== 0) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  count(disc: Disc): number {
+    return this._discs
+      .map((line) => {
+        return line.filter((discOnBoard) => discOnBoard === disc).length;
+      })
+      .reduce((v1, v2) => v1 + v2, 0);
   }
 
   private wallDiscs(): Disc[][] {

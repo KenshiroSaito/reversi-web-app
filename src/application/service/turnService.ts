@@ -74,7 +74,6 @@ export class TurnService {
     const conn = await connectMySQL();
 
     try {
-      // Get the previous turn
       const game = await gameRepository.findLatest(conn);
       if (!game) {
         throw new ApplicationError(
@@ -94,11 +93,14 @@ export class TurnService {
         previousTurnCount,
       );
 
-      // Place a stone
       const newTurn = previousTurn.placeNext(disc, point);
 
-      // Save the turn
       await turnRepository.save(conn, newTurn);
+
+      if (newTurn.gameEnded()) {
+        const winnerDisc = newTurn.winnerDisc();
+              
+      }
 
       await conn.commit();
     } finally {
