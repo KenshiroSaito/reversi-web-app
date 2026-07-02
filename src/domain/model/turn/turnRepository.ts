@@ -1,6 +1,7 @@
-import { MoveGateway } from "../../infrastructure/moveGateway";
-import { SquareGateway } from "../../infrastructure/squareGateway";
-import { TurnGateway } from "../../infrastructure/turnGateway";
+import { MoveGateway } from "../../../infrastructure/moveGateway";
+import { SquareGateway } from "../../../infrastructure/squareGateway";
+import { TurnGateway } from "../../../infrastructure/turnGateway";
+import { DomainError } from "../../error/domainError";
 import { Board } from "./board";
 import { toDisc } from "./disc";
 import { Move } from "./move";
@@ -25,7 +26,10 @@ export class TurnRepository {
     );
 
     if (!turnRecord) {
-      throw new Error("Specified turn not found");
+      throw new DomainError(
+        "SpecifiedTurnNotFound",
+        "Specified turn not found",
+      );
     }
 
     const squareRecords = await squareGateway.findForTurnId(

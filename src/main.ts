@@ -3,6 +3,7 @@ import morgan from "morgan";
 import "express-async-errors";
 import { gameRouter } from "./presentation/gameRouter";
 import { turnRouter } from "./presentation/turnRouter";
+import { DomainError } from "./domain/error/domainError";
 
 const PORT = 3000;
 
@@ -27,6 +28,14 @@ function errorHandler(
   res: express.Response,
   _next: express.NextFunction,
 ) {
+  if (err instanceof DomainError) {
+    res.status(400).json({
+      type: err.type,
+      message: err.message,
+    });
+    return;
+  }
+
   console.error("Unexpected Error occured");
   res.status(500).send({
     message: "Unexpected Error occured",

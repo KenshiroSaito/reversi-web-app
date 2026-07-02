@@ -1,3 +1,4 @@
+import { DomainError } from "../../error/domainError";
 import { Disc, isOppositeDisc } from "./disc";
 import { Move } from "./move";
 import { Point } from "./point";
@@ -11,14 +12,17 @@ export class Board {
   place(move: Move): Board {
     // You can't place a stone unless its the empty square
     if (this._discs[move.point.y][move.point.x] !== Disc.Emoty) {
-      throw new Error("Select point is not empty");
+      throw new DomainError(
+        "SelectedPointIsNotEmpty",
+        "Select point is not empty",
+      );
     }
     // List the reversible point
     const flipPoints = this.listFlipPoints(move);
 
     // Can't place a stone if there's no reversible point
     if (flipPoints.length === 0) {
-      throw new Error("Flip points is empty");
+      throw new DomainError("FlipPointsIsEmpty", "Flip points is empty");
     }
 
     // Copy the board
