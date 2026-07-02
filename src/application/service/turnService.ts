@@ -1,8 +1,9 @@
-import { connectMySQL } from "../infrastructure/connection";
-import { GameRepository } from "../domain/model/game/gameRepository";
-import { toDisc } from "../domain/model/turn/disc";
-import { Point } from "../domain/model/turn/point";
-import { TurnRepository } from "../domain/model/turn/turnRepository";
+import { connectMySQL } from "../../infrastructure/connection";
+import { GameRepository } from "../../domain/model/game/gameRepository";
+import { toDisc } from "../../domain/model/turn/disc";
+import { Point } from "../../domain/model/turn/point";
+import { TurnRepository } from "../../domain/model/turn/turnRepository";
+import { ApplicationError } from "../error/applicationError";
 
 const turnRepository = new TurnRepository();
 const gameRepository = new GameRepository();
@@ -41,7 +42,10 @@ export class TurnService {
     try {
       const game = await gameRepository.findLatest(conn);
       if (!game) {
-        throw new Error("Latest game not found");
+        throw new ApplicationError(
+          "LatestGameNotFound",
+          "Latest game not found",
+        );
       }
 
       if (!game.id) {
@@ -73,7 +77,10 @@ export class TurnService {
       // Get the previous turn
       const game = await gameRepository.findLatest(conn);
       if (!game) {
-        throw new Error("Latest game not found");
+        throw new ApplicationError(
+          "LatestGameNotFound",
+          "Latest game not found",
+        );
       }
 
       if (!game.id) {
