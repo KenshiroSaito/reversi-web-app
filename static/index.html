@@ -11,96 +11,21 @@
 <body>
   <h1>Reversi</h1>
   <main>
-    <div class="warning-message-area">
-      <p id="warning-message" class="warning-message">Skip: White Turn</p>
-    </div>
-    <div class="board" id="board">
-      <!-- 8 squares-->
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <!-- 8 squares-->
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <!-- 8 squares-->
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <!-- 8 squares-->
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square">
-        <div class="stone dark"></div>
-      </div>
-      <div class="square">
-        <div class="stone light"></div>
-      </div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <!-- 8 squares-->
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square">
-        <div class="stone light"></div>
-      </div>
-      <div class="square">
-        <div class="stone dark"></div>
-      </div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <!-- 8 squares-->
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <!-- 8 squares-->
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <!-- 8 squares-->
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-      <div class="square"></div>
-    </div>
-    <p id="next-disc-message">Next: Black Turn</p>
+    <a href="/game/">Start a Match</a>
+    <table>
+      <thead>
+        <tr>
+          <th>Number of times Black played</th>
+          <th>Number of times White played</th>
+          <th>Winning Stone</th>
+          <th>Match Start Time</th>
+          <th>Match End Time</th>
+        </tr>
+      </thead>
+      <tbody id="games-table-body"></tbody>
+    </table>
   </main>
   <script src="main.js"></script>
 </body>
-
-
 
 </html>
