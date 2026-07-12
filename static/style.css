@@ -1,8 +1,54 @@
 body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 64px 20px;
   text-align: center;
+  font-family: "Gill Sans", sans-serif;
+  color: #222;
+  background: #fafafa;
+}
+
+h1 {
+  margin: 0 0 30px;
+  font-size: 2.4rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.start-button {
+  display: inline-block;
+  padding: 11px 30px;
+  color: #222;
+  text-decoration: none;
+  border: 1.5px solid #222;
+  transition: 0.2s;
+}
+
+.start-button:hover {
+  background: #222;
+  color: #fafafa;
 }
 
 table {
-  padding-top: 50px;
-  margin: 0 auto;
+  margin: 48px auto 0;
+  width: 100%;
+  max-width: 820px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+th,
+td {
+  padding: 15px 18px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+thead th {
+  font-weight: 500;
+  color: #888;
+  border-bottom: 2px solid #222;
+}
+
+tbody tr:hover {
+  background: #f3f3f3;
 }

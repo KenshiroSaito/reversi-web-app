@@ -1,4 +1,4 @@
-const gmaesTableBodyElement = document.getElementById("games-taeble-body");
+const gamesTableBodyElement = document.getElementById("games-table-body");
 
 async function showGames() {
   const response = await fetch("/api/games");

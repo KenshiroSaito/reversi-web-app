@@ -27,12 +27,10 @@ async function showBoard(turnCount, previousDisc) {
 
   board.forEach((line, y) => {
     line.forEach((square, x) => {
-      // <div class="square">
       const squareElement = document.createElement("div");
       squareElement.className = "square";
 
       if (square !== EMPTY) {
-        // <div class="stone dark">
         const stoneElement = document.createElement("div");
         const color = square === DARK ? "dark" : "light";
         stoneElement.className = `stone ${color}`;
@@ -49,6 +47,8 @@ async function showBoard(turnCount, previousDisc) {
           );
           if (registerTurnResponse.ok) {
             await showBoard(nextTurnCount, nextDisc);
+          } else {
+            showCannotPlaceMessage(nextDisc);
           }
         });
       }
@@ -97,6 +97,10 @@ function showNextDiscMessage(nextDisc) {
   } else {
     nextDiscMessageElement.innerText = "";
   }
+}
+
+function showCannotPlaceMessage() {
+  nextDiscMessageElement.innerText = "You can't place a stone there";
 }
 
 async function registerGame() {
