@@ -183,7 +183,15 @@ explicit config makes local runs, Vitest, and Vercel's compiler agree:
 Operator guide: create the Aiven MySQL service; load the schema once
 (`mysql ... < mysql/init.sql` over TLS); Vercel project settings
 (framework "Other", root directory, Node 24); the environment variable
-list; pool sizing (see §6); how to verify the deployment.
+list; pool sizing (see §6); region placement; how to verify the
+deployment.
+
+**Region placement** gets its own section. Vercel Functions run in `iad1`
+(Washington, D.C.) by default, so the Aiven service must be created in the
+same region (e.g. AWS `us-east-1`), or the function region must be changed
+to match the database. Every query — plus the `ROLLBACK` issued by each
+`end()` — pays the function-to-database round trip, and Phase 2 polls every
+second, so a cross-continent database would make every request slow.
 
 ## 6. Connection budget
 
@@ -297,7 +305,9 @@ New files: `api/index.ts`, `vercel.json`, `tsconfig.json`,
 - `hello.ts` at the repository root appears unused.
 - `mysql2` uses the process time zone for `DATETIME` values; Vercel runs in
   UTC while local development may not, so stored times differ by
-  environment.
+  environment. **This must be resolved at the start of Phase 2**: the
+  derived clock depends on `turn_started_at` being interpreted identically
+  in every environment.
 
 ## 11. Risks
 
