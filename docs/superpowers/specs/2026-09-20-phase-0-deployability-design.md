@@ -115,9 +115,14 @@ Rules:
 - Holds one module-level pool, created **lazily** on the first
   `connectMySQL()` call, so a configuration error surfaces as a normal
   request error (500 + log) instead of crashing the module at import.
-- Right after creation, the pool is registered with
-  `attachDatabasePool(pool)` so idle connections are closed before the
-  function instance is suspended. Outside Vercel this is a no-op.
+- Right after creation, the pool is registered with `attachDatabasePool`
+  so the function instance stays alive until idle connections are closed.
+  Outside Vercel this is a no-op. The helper rejects mysql2's promise pool
+  ("Unsupported database pool type") and, given the core pool, reads the
+  idle timeout from a field mysql2 does not set (falling back to 60 s). It
+  is therefore passed the duck-typed shape its typings allow:
+  `{ on: <core pool's "release" event>, config: { idleTimeout } }`, with
+  `idleTimeout` = 5000 ms + mysql2's 1 s idle-check interval.
 - `connectMySQL()` keeps its name and return type (`mysql.Connection`), so
   no caller changes. It acquires a pooled connection and replaces its
   `end()` with a release routine:
@@ -254,15 +259,17 @@ Cases:
    `TurnRepository` stub whose `save()` (called after `beginTransaction()`
    and the game insert):
    - records `CONNECTION_ID()` and the inserted game id,
-   - asserts the connection is inside a transaction
-     (`information_schema.innodb_trx` has a row for `CONNECTION_ID()`) —
-     this proves the detector works,
+   - records whether the connection is inside a transaction, read as root
+     from `performance_schema.events_transactions_current` (the app user
+     cannot read `information_schema.innodb_trx`, and that table is cached
+     and lags the real state); the test asserts this was 1, which proves
+     the detector works,
    - throws.
 
    The test then asserts the use case rejected, acquires the next
    connection via `connectMySQL()`, and verifies: same `CONNECTION_ID()`
-   (it really is the reused connection), no `innodb_trx` row for it, and no
-   `games` row with the recorded id.
+   (it really is the reused connection), no active transaction for it, and
+   no `games` row with the recorded id.
 3. **A connection that dies is not returned to the pool.** Kill the
    connection's own session from a second (non-pooled) connection before
    `end()`; `end()` must resolve, and the next `connectMySQL()` must succeed
