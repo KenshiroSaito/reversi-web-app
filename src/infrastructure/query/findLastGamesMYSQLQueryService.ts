@@ -19,7 +19,7 @@ select
   sum(case when m.disc = 2 then 1 else 0 end) as light_move_count,
   max(gr.winner_disc) as winner_disc,
   max(g.started_at) as started_at,
-  max(gr.end_at) as end_at
+  coalesce(max(gr.end_at), max(t.end_at)) as end_at
 from games g
 left join game_results gr on gr.game_id = g.id
 left join turns t on t.game_id = g.id

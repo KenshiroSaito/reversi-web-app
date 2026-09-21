@@ -72,6 +72,28 @@ function showWarningMessage(previousDisc, nextDisc, winnerDisc) {
   } else {
     warningMessageElement.style.display = "block";
   }
+
+  warningMessageElement.style.background = warningMessageColor(
+    previousDisc,
+    nextDisc,
+    winnerDisc,
+  );
+}
+
+function warningMessageColor(previousDisc, nextDisc, winnerDisc) {
+  if (nextDisc !== null) {
+    if (previousDisc === nextDisc) {
+      return "#c94542";
+    } else {
+      return "";
+    }
+  } else {
+    if (winnerDisc === WINNER_DRAW) {
+      return "";
+    } else {
+      return "#469c3d";
+    }
+  }
 }
 
 function warningMessage(previousDisc, nextDisc, winnerDisc) {
@@ -97,10 +119,12 @@ function showNextDiscMessage(nextDisc) {
   } else {
     nextDiscMessageElement.innerText = "";
   }
+  nextDiscMessageElement.style.background = "";
 }
 
 function showCannotPlaceMessage() {
   nextDiscMessageElement.innerText = "You can't place a stone there";
+  nextDiscMessageElement.style.background = "#fffc63";
 }
 
 async function registerGame() {
