@@ -1,0 +1,5 @@
+{
+  "framework": null,
+  "outputDirectory": "static",
+  "rewrites": [{ "source": "/api/(.*)", "destination": "/api" }]
+}
