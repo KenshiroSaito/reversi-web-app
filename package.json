@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon",
-    "test": "vitest run --project unit"
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration"
   },
   "author": "",
   "license": "ISC",
@@ -22,6 +23,7 @@
     "vitest": "^5.0.1"
   },
   "dependencies": {
+    "@vercel/functions": "^3.9.9",
     "express": "^4.18.1",
     "express-async-errors": "^3.1.1",
     "morgan": "^1.10.0",
