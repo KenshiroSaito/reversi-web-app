@@ -47,8 +47,8 @@ mysql --host=<host> --port=<port> --user=avnadmin --password \
 
 ## 5. Environment variables
 
-Set these in **Settings → Environment Variables** for Production (and Preview,
-if preview deployments should reach a database):
+Set these in **Settings → Environment Variables**, scoped to **Production
+only**. Preview deployments get their own values; see section 6.
 
 | Variable | Value |
 | --- | --- |
@@ -58,13 +58,43 @@ if preview deployments should reach a database):
 | `DB_PASSWORD` | Its password |
 | `DB_NAME` | `reversi` |
 | `DB_CA_CERT` | Full contents of `ca.pem`, including the `BEGIN`/`END` lines |
-| `DB_POOL_MAX` | Optional, default `3` (see below) |
+| `DB_POOL_MAX` | Optional, default `3` (see section 7) |
 
 The app refuses to connect on Vercel without `DB_CA_CERT`, and verifies the
 server certificate against it. A missing variable is reported by name in the
 function logs; values are never logged.
 
-## 6. Sizing the connection pool
+## 6. Preview deployments
+
+Every push to a non-production branch (for example a `feat/phase-N-*` branch)
+creates a Preview deployment. Feature branches can change the schema, so a
+preview must never point at the production database.
+
+In Vercel, each environment variable is assigned to one or more environments
+(Production, Preview, Development). Add every `DB_*` variable **twice**:
+
+- once scoped to **Production**, with the production database's values;
+- once scoped to **Preview**, with a separate preview database's values.
+
+Never tick Preview on a production value. If a `DB_*` variable is missing from
+the Preview scope, preview deployments fail with `Missing required environment
+variable` rather than silently falling back to production.
+
+For the preview database, use a second Aiven service if your plan allows it
+(it can then keep the database name `reversi`). Otherwise create a second
+database on the same service and load the schema into it under its own name:
+
+```bash
+sed -e 's/ reversi;/ reversi_preview;/' mysql/init.sql | \
+  mysql --host=<host> --port=<port> --user=avnadmin --password \
+    --ssl-mode=VERIFY_CA --ssl-ca=ca.pem
+```
+
+and set the Preview-scoped `DB_NAME` to `reversi_preview`. Two databases on
+one service share its `max_connections`, so size `DB_POOL_MAX` for both
+(section 7).
+
+## 7. Sizing the connection pool
 
 Each function instance keeps at most `DB_POOL_MAX` connections and closes them
 after about 5 seconds without use, before the instance is suspended. The
@@ -79,7 +109,7 @@ raise it; if Aiven reports too many connections, lower it. Avoid 1 in
 production: it serialises concurrent requests on an instance without reducing
 the total number of connections.
 
-## 7. Verify the deployment
+## 8. Verify the deployment
 
 1. Open the site; the home page and `/game/` load (served by the CDN).
 2. Start a match and place a few stones.
