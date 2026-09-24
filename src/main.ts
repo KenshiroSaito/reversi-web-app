@@ -8,7 +8,7 @@ import { ApplicationError } from "./application/error/applicationError";
 
 const PORT = 3000;
 
-const app = express();
+export const app = express();
 
 app.use(morgan("dev"));
 app.use(express.static("static", { extensions: ["html"] }));
@@ -19,9 +19,13 @@ app.use(turnRouter);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Reversi application : http://localhost:${PORT}`);
-});
+// Vercel imports the app instead of running this file, so only open a port
+// when started directly (npm start).
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Reversi application : http://localhost:${PORT}`);
+  });
+}
 
 function errorHandler(
   err: any,
