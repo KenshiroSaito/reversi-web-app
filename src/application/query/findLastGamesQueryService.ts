@@ -33,7 +33,7 @@ export class FindLastGamesQueryModel {
 
 export interface FindLastGamesQueryService {
   query (
-    conn: mysql.Connection,
+    conn: mysql.Connection, 
     playerId: number,
     limitL: number
   ): Promise<FindLastGamesQueryModel[]>
