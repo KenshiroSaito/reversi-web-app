@@ -44,6 +44,27 @@ export function assertSafeTarget(args: MigrateArgs, options: mysql.PoolOptions):
   }
 }
 
+/**
+ * One readable line per error. mysql2 reports a refused localhost connection
+ * as an AggregateError with an empty message, so the code and the nested
+ * errors are included; printing only `message` would show a blank line.
+ */
+export function formatCliError(err: unknown): string {
+  if (!(err instanceof Error)) {
+    return String(err);
+  }
+  const code = (err as { code?: unknown }).code;
+  const parts = [err.message || err.name];
+  if (typeof code === "string" && !err.message.includes(code)) {
+    parts.push(`(${code})`);
+  }
+  const nested = (err as { errors?: unknown }).errors;
+  if (Array.isArray(nested)) {
+    parts.push(...nested.map((entry) => `- ${formatCliError(entry)}`));
+  }
+  return parts.join("\n");
+}
+
 async function main(): Promise<void> {
   const args = parseMigrateArgs(process.argv.slice(2));
   // Either the given file or the local .env, never both, so local settings
@@ -76,7 +97,7 @@ async function main(): Promise<void> {
 
 if (require.main === module) {
   main().catch((e) => {
-    console.error(e instanceof Error ? e.message : e);
+    console.error(formatCliError(e));
     process.exitCode = 1;
   });
 }

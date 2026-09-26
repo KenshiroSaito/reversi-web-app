@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { assertSafeTarget, parseMigrateArgs } from "../../src/infrastructure/migration/migrateCli";
+import { assertSafeTarget, formatCliError, parseMigrateArgs } from "../../src/infrastructure/migration/migrateCli";
+
+describe("formatCliError", () => {
+  it("names the code when the error message is empty, as for a refused localhost connection", () => {
+    const refused = Object.assign(new Error("connect ECONNREFUSED ::1:3306"), { code: "ECONNREFUSED" });
+    const aggregate = Object.assign(new AggregateError([refused], ""), { code: "ECONNREFUSED" });
+
+    const text = formatCliError(aggregate);
+
+    expect(text).toContain("ECONNREFUSED");
+    expect(text).toContain("connect ECONNREFUSED ::1:3306");
+  });
+
+  it("prints a plain message as-is", () => {
+    expect(formatCliError(new Error("--database x does not match DB_NAME y"))).toBe(
+      "--database x does not match DB_NAME y",
+    );
+  });
+});
 
 describe("parseMigrateArgs", () => {
   it("reads --env-file and --database", () => {
