@@ -37,7 +37,8 @@ Done means:
 | Spectating others' games | later | Participants only; non-participants get 404 |
 | Editable display names | 5–6 | Profiles |
 | The DATETIME time-zone fix | start of 2 | As agreed. New Phase 1 columns use the database clock (`CURRENT_TIMESTAMP(3)`) so they are unaffected |
-| Changing how boards are stored | see §16 | Existing storage design; flagged for decision |
+| Changing how boards are stored | Storage phase, right after Phase 1 | Decided at spec review; see §17 |
+| Retention, cleanup, disk-usage safeguards | 2 (with the daily cron) | See §17 |
 | Editing existing files in `src/domain/` | — | Only new files under `src/domain/model/gamePlayer/` (approved) |
 
 ## 3. Findings that shape this design
@@ -60,7 +61,7 @@ Done means:
    `test/integration/connection.test.ts` calls the three "latest" use cases
    directly, and `test/integration/vercelEntry.test.ts` posts without CSRF
    headers and expects a non-empty history without a cookie. Both are
-   ported; every assertion is kept (§14.3).
+   ported; every assertion is kept (§14.5).
 6. **The move flow does not need a `Game` object.** Seats prove the game
    exists; the latest `Turn` is loaded by `(gameId, turnCount)` and the
    existing `Turn.placeNext(disc, point)` does the rest. So `GameRepository`
@@ -245,6 +246,27 @@ export interface GameSeatsRepository {
 The invariant violation throws a plain `Error` (a corrupted database is a
 server fault, 500) rather than a `DomainError`, because adding a type to
 `DomainError` would edit an existing domain file.
+
+**The invariant can only fail through a bug, never through a request.**
+The constructor is reached from exactly two places:
+
+1. `GameSeats.forLocalGame` — always one Dark and one Light seat.
+2. `GameSeatsMYSQLRepository.findForGameId` — built from `game_players`
+   rows, which the schema constrains: `primary key (game_id, disc)` allows at
+   most one row per colour, `check (disc in (1, 2))` allows only the two
+   colours, and both rows are written by one multi-row `INSERT` in the same
+   transaction as the game (§7.2), so a game never has exactly one seat.
+   **Zero rows** (a pre-Phase-1 game, or an ID that does not exist) must
+   return `undefined`, which the use cases map to 404; the repository never
+   constructs `GameSeats` from an empty row set.
+
+Everything a user can cause maps to 4xx: not a participant or unknown game
+→ 404; not your turn, stale `turnCount`, game over → 409; illegal move and
+invalid input → 400. The checks in §7.3 run in an order that makes each
+later step safe (the game-over check precedes any use of `turn.nextDisc`).
+
+Phase 4 note: a matchmaking game waiting for its second player would have
+one seat; that phase must revisit this invariant.
 
 ### 7.2 Create a local game — `CreateLocalGameUseCase.run(playerId): Promise<number>`
 
@@ -484,6 +506,8 @@ entry) with code `ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, `ENOTFOUND`,
     `GET /api/me` returns `Guest NNNN`;
   - CSRF: missing header or foreign `Origin` → 403; GET without them → 200;
   - another guest's cookie, or none, on someone's game → 404;
+  - a game with no seats (inserted directly, like a pre-Phase-1 game) and a
+    game ID that does not exist → 404, never 500;
   - legal move → 201 with the new state; illegal → 400; `x` of 1.5, 8,
     `"3"` → 400; stale `turnCount` → 409; move on an ended game → 409;
   - two identical moves sent concurrently (pool of 2 in that file) → one
@@ -494,11 +518,46 @@ entry) with code `ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, `ENOTFOUND`,
 - **Database unreachable:** with `DB_PORT` stubbed to a closed port,
   `POST /api/games` → 503 `ServiceUnavailable`, and the logged line
   contains `ECONNREFUSED`.
-- **Manual:** play a full local game in the browser against
-  `reversi_test` (`DB_NAME=reversi_test npm start`), reload mid-game, open
-  the game URL in a private window (404 page).
+### 14.3 Browser end-to-end (`npm run test:e2e`, `@playwright/test`)
 
-### 14.3 Ported tests — every assertion kept
+A third suite, separate from unit and integration, driving Chromium against
+the app on `http://localhost:3000` backed by `reversi_test`:
+
+- `playwright.config.ts` starts the app itself (`webServer`) with
+  `DB_NAME=reversi_test` set in the process environment (it overrides
+  `.env`, verified), and `reuseExistingServer: false`, so a developer
+  server already on port 3000 (pointing at `reversi`) makes the run fail
+  instead of being used. `baseURL` is fixed to `http://localhost:3000`.
+- Its `globalSetup` reuses the integration suite's rebuild of
+  `reversi_test` (`init.sql` + migrations) and applies the same
+  `reversi_test` safeguard, so each run starts empty.
+- Specs (`test/e2e/*.spec.ts`; Vitest's `include` patterns never match
+  them):
+  1. **Local play resumes after reload:** start a game from the home page,
+     make several legal moves, reload, and assert the URL keeps `?id=`, the
+     board shows the same discs, and the next-turn message is unchanged.
+  2. **Two guests are isolated:** browser contexts A and B have separate
+     cookies. A starts a game; B opening A's game URL sees the not-found
+     message, and a move request from B's page (`fetch` with the CSRF
+     header) returns 404 and leaves A's board unchanged.
+  3. **CSRF:** from A's page, a move request without `X-Requested-With`
+     returns 403 and no move is recorded.
+- Chromium is installed with `npx playwright install chromium`
+  (documented in the README).
+- Run order: the integration and e2e suites both rebuild `reversi_test`,
+  so they run one after the other, never in parallel.
+
+### 14.4 Manual browser checks (Playwright MCP)
+
+During implementation, the UI is also checked by hand through the
+Playwright MCP server, **only** against the local app running on
+`reversi_test` (`DB_NAME=reversi_test npm start`), never against preview or
+production URLs: a full local game to the end, skip and winner messages,
+reload mid-game, the not-found page, and the error messages in §12. The
+end-of-phase report lists which checks were done this way and which are
+covered by committed e2e tests.
+
+### 14.5 Ported tests — every assertion kept
 
 `test/integration/connection.test.ts` keeps all 10 `expect` calls; the
 assertion lines are identical except the calls they wrap
@@ -648,15 +707,16 @@ its `GET` sends the cookie the `POST` returned.
 | `src/application/useCase/findLastGamesUseCase.ts` | `run(playerId)` | Same |
 | `src/infrastructure/query/findLastGamesMYSQLQueryService.ts` | Add the player filter (§7.5) | Same |
 | `src/infrastructure/connection.ts` | Schema check on first use (§5.4); `closePool()` also resets it | Migration check requirement |
-| `test/integration/connection.test.ts` | Port to the new use cases (§14.3) | Its use cases are deleted |
-| `test/integration/vercelEntry.test.ts` | CSRF headers and cookie (§14.3) | CSRF and per-player history |
-| `test/integration/globalSetup.ts` | Apply `MIGRATIONS` after `init.sql` | `reversi_test` needs the new tables |
+| `test/integration/connection.test.ts` | Port to the new use cases (§14.5) | Its use cases are deleted |
+| `test/integration/vercelEntry.test.ts` | CSRF headers and cookie (§14.5) | CSRF and per-player history |
+| `test/integration/globalSetup.ts` | Apply `MIGRATIONS` after `init.sql`; export the rebuild as `rebuildTestDatabase()` so the e2e suite reuses it | `reversi_test` needs the new tables; one rebuild for both suites |
 | `vitest.config.ts` | Add the safeguard `setupFiles` to the integration project | Test safeguard requirement |
+| `tsconfig.json` | Add `playwright.config.ts` to `include` (`test/e2e` is already covered by `test`) | Type-check the e2e config |
 | `static/game/main.js` | New endpoints, `?id=`, CSRF header, no `disc` in requests, error messages (§12) | Local play on the new API |
-| `package.json` / `package-lock.json` | Add `cookie-parser`, `@types/cookie-parser`; `migrate` script | Cookie parsing; migrations |
+| `package.json` / `package-lock.json` | Add `cookie-parser`, `@types/cookie-parser`, dev dependency `@playwright/test` (^1.63); scripts `migrate` and `test:e2e` (`playwright test`) | Cookie parsing; migrations; e2e suite (§14.3) |
 | `.env.example` | Add `IP_HASH_SECRET=local-development-only` | Guest cap |
-| `.gitignore` | Add `.env.*` and `!.env.example` | `npm run migrate --env-file .env.preview` files hold secrets |
-| `docs/deployment.md`, `README.md`, `docs/openapi.yaml` | §13 | Docs match the code |
+| `.gitignore` | Add `.env.*` and `!.env.example`; add Playwright output `test-results/` and `playwright-report/` | `npm run migrate --env-file .env.preview` files hold secrets; test artefacts stay out of git |
+| `docs/deployment.md`, `README.md`, `docs/openapi.yaml` | §13; README also documents `npm run test:e2e` and `npx playwright install chromium` | Docs match the code |
 
 ### 15.2 Deleted
 
@@ -684,25 +744,20 @@ No existing file changes. New files only (approved):
 | Application | `identity/player.ts` (`{ id, displayName }`), `identity/playerRepository.ts` (port: `findByTokenHash`, `insert`, `lockForUpdate`), `identity/playerToken.ts`, `identity/guestName.ts`; `query/latestTurnQueryService.ts`, `query/rateLimitQueryService.ts` (`countGuestsCreatedInLastHour(ipHash)`, `countGamesCreatedInLastHour(playerId)`); `useCase/registerGuestUseCase.ts`, `useCase/findPlayerByTokenUseCase.ts`, `useCase/createLocalGameUseCase.ts`, `useCase/findGameStateUseCase.ts`, `useCase/registerMoveUseCase.ts` |
 | Infrastructure | `repository/player/{playerGateway,playerRecord,playerMYSQLRepository}.ts`, `repository/gamePlayer/{gameSeatGateway,gameSeatRecord,gameSeatsMYSQLRepository}.ts`, `query/latestTurnMYSQLQueryService.ts`, `query/rateLimitMYSQLQueryService.ts`, `migration/{migrations,migrationRunner,schemaCheck,migrateCli}.ts`, `databaseAvailability.ts` |
 | Presentation | `errorHandler.ts`, `errorLogging.ts` (`describeError`), `validation.ts` (`ValidationError`, parsers), `gameStateResponse.ts`, `meRouter.ts`, `middleware/csrfProtection.ts` (`CsrfRejectedError`), `middleware/identity.ts` (`attachPlayer`, `ensurePlayer`), `identity/identityConfig.ts`, `identity/playerCookie.ts`, `identity/clientIp.ts` |
-| Tests | `test/unit/*.test.ts` (§14.1), `test/integration/{setup,apiClient}.ts`, `test/integration/{migrations,api,databaseUnavailable}.test.ts` |
+| Tests | `test/unit/*.test.ts` (§14.1), `test/integration/{setup,apiClient}.ts`, `test/integration/{migrations,api,databaseUnavailable}.test.ts`, `test/e2e/{globalSetup.ts,localPlay.spec.ts,guestIsolation.spec.ts,csrf.spec.ts}` |
+| Config | `playwright.config.ts` (repository root) |
 
-All paths under `src/` except the test row. Gateways, records, and MySQL
+All paths under `src/` except the test and config rows. Gateways, records, and MySQL
 repositories follow the existing `*Gateway` / `*Record` / `*MYSQLRepository`
 pattern.
 
 ## 16. Risks and known limits
 
-1. **Board storage limits the whole free tier (needs a decision).** Every
-   turn stores 64 square rows (≈ 6.5 KB), so:
-   - **legitimate use:** 1 GB holds about **2,500 finished games** in
-     total;
-   - **abuse through moves:** the caps in §10 bound game *creation*, but a
-     client can play its allowed games through; one IP at 200 games/h × 60
-     moves ≈ 78 MB/h fills 1 GB in about 13 hours, bounded otherwise only
-     by the firewall.
-
-   Phase 1 does not change board storage (it is existing infrastructure).
-   See the open question below.
+1. **Board storage limits the whole free tier until the storage phase.**
+   Every turn stores 64 square rows (≈ 6.5 KB), so 1 GB holds about 2,500
+   finished games, and moves (not bounded by the §10 caps) can fill it in
+   about 13 hours from one IP. Phase 1 ships with this limit; the storage
+   phase that follows it removes the cause (§17.1).
 2. **Migration order.** Migrate `reversi_preview` before a preview deploy
    and `reversi` before the production deploy. A missed migration now
    fails with a clear 503 and log line instead of 500s.
@@ -716,14 +771,57 @@ pattern.
 7. **One extra query per API request** for identity, so the function and
    database regions must match (already documented).
 
-## 17. Open question for review
+## 17. Follow-ups for later phases (not implemented in Phase 1)
 
-**Board storage.** Should compacting how turns store the board (for
-example one `binary(16)` or `char(64)` column per turn instead of 64
-`squares` rows, about 40× smaller) be added to Phase 1, scheduled as its
-own phase before Phase 4 opens the site to strangers, or deferred? It would
-change existing infrastructure files (`turnMYSQLRepository.ts`,
-`squareGateway.ts`, a data migration), not the domain.
+Decided at spec review; recorded here so the next phases start from it.
+
+### 17.1 Measurements (2026-09-25, MySQL 8.0.29, `reversi_test`)
+
+1,000 synthetic turns for one game, each with 64 `squares` rows and one
+`moves` row, after `ANALYZE TABLE`, data + index length:
+
+| Table | Rows | Size | Bytes per row |
+| --- | --- | --- | --- |
+| `squares` | 64,616 | 6,176 KB | ≈ 98 |
+| `turns` | 1,005 | 128 KB | ≈ 130 |
+| `moves` | 1,001 | 96 KB | ≈ 98 |
+
+Derived: one turn ≈ 64 × 98 + 130 + 98 ≈ **6.5 KB**; a new game ≈ 6.5 KB; a
+finished game (~60 moves, ~61 turns) ≈ **400 KB**; 1 GB ≈ **2,500 finished
+games**. Squares are ~96 % of the cost. Move-driven growth from one IP is
+bounded only by the firewall (≈ 78–117 MB/h, i.e. 1 GB in 9–13 h).
+
+### 17.2 Storage phase (next, before Phase 2)
+
+Scheduled before Phase 2 because Phase 2 adds clock columns to `turns`,
+fixes the time zone issue, and polls the board every second; those queries
+should be written once, against the new format.
+
+- Stop storing 64 rows per turn. Options to evaluate in that phase:
+  - **(A)** the whole board in one compact column per turn;
+  - **(B)** store only the moves, plus a snapshot of the latest board; any
+    past position is rebuilt by replaying moves from the start.
+  The owner leans towards (B), since game history and replay need the move
+  list anyway; the choice is made in that phase.
+- Migrate existing data.
+
+### 17.3 Phase 2 (with the daily cron)
+
+- Delete games with no moves after a day.
+- Retention for games nobody can open any more (all players are guests who
+  have been inactive for a long time); the exact policy is decided in
+  Phase 2.
+- An emergency valve based on actual disk usage (from
+  `information_schema`), not game count: above a threshold, delete the
+  oldest guest-only games in small batches so the 1-CPU database is not
+  blocked.
+- Near the limit, stop creating new games with a clear message while games
+  in progress continue. A full disk must never make the whole site return
+  500s.
+
+### 17.4 Phase 4
+
+- Revisit the seat invariant (§7.1) for games waiting for a second player.
 
 ## 18. Pre-existing issues (reported, not fixed)
 
