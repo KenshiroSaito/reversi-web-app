@@ -1,4 +1,4 @@
-type ApplicationErrorType = "LatestGameNotFound";
+export type ApplicationErrorType = "LatestGameNotFound";
 
 export class ApplicationError extends Error {
   constructor(

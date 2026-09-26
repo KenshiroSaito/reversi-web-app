@@ -3,8 +3,7 @@ import morgan from "morgan";
 import "express-async-errors";
 import { gameRouter } from "./presentation/gameRouter";
 import { turnRouter } from "./presentation/turnRouter";
-import { DomainError } from "./domain/error/domainError";
-import { ApplicationError } from "./application/error/applicationError";
+import { errorHandler } from "./presentation/errorHandler";
 
 const PORT = 3000;
 
@@ -24,36 +23,5 @@ app.use(errorHandler);
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Reversi application : http://localhost:${PORT}`);
-  });
-}
-
-function errorHandler(
-  err: any,
-  _req: express.Request,
-  res: express.Response,
-  _next: express.NextFunction,
-) {
-  if (err instanceof DomainError) {
-    res.status(400).json({
-      type: err.type,
-      message: err.message,
-    });
-    return;
-  }
-
-  if (err instanceof ApplicationError) {
-    switch (err.type) {
-      case "LatestGameNotFound":
-        res.status(404).json({
-          type: err.type,
-          message: err.message,
-        });
-        return;
-    }
-  }
-
-  console.error("Unexpected Error occured");
-  res.status(500).send({
-    message: "Unexpected Error occured",
   });
 }
