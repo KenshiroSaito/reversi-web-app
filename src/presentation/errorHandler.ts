@@ -5,6 +5,7 @@ import { SchemaOutOfDateError } from "../infrastructure/migration/schemaCheck";
 import { isDatabaseUnavailable } from "../infrastructure/databaseAvailability";
 import { describeError } from "./errorLogging";
 import { ValidationError } from "./validation";
+import { CsrfRejectedError } from "./middleware/csrfProtection";
 
 // Every ApplicationError type must have a status; the compiler enforces it.
 export const APPLICATION_ERROR_STATUS: Record<ApplicationErrorType, number> = {
@@ -30,6 +31,11 @@ export function errorHandler(
 
   if (err instanceof ValidationError) {
     res.status(400).json({ type: "InvalidRequest", message: err.message });
+    return;
+  }
+
+  if (err instanceof CsrfRejectedError) {
+    res.status(403).json({ type: "CsrfRejected", message: err.message });
     return;
   }
 

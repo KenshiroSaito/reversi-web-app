@@ -248,3 +248,37 @@ async function insertNearlyFinishedTurn(gameId: number) {
     values,
   );
 }
+
+describe("CSRF protection", () => {
+  it("rejects a POST without the header, and creates no guest", async () => {
+    const response = await new Guest(server).post("/api/games", undefined, { csrf: false });
+
+    expect(response.status).toBe(403);
+    expect(response.body.type).toBe("CsrfRejected");
+    expect(response.setCookie).toBeUndefined();
+  });
+
+  it("rejects a POST from another origin", async () => {
+    const response = await new Guest(server).post("/api/games", undefined, { origin: "http://evil.example" });
+
+    expect(response.status).toBe(403);
+  });
+
+  it("rejects a move without the header and records nothing", async () => {
+    const guest = new Guest(server);
+    const gameId = await startGame(guest);
+
+    const response = await guest.post(
+      `/api/games/${gameId}/turns`,
+      { turnCount: 1, move: { x: 4, y: 2 } },
+      { csrf: false },
+    );
+
+    expect(response.status).toBe(403);
+    expect((await guest.get(`/api/games/${gameId}`)).body.turnCount).toBe(0);
+  });
+
+  it("lets GET requests through without the header", async () => {
+    expect((await new Guest(server).get("/api/games")).status).toBe(200);
+  });
+});

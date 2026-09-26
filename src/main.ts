@@ -6,6 +6,7 @@ import { gameRouter } from "./presentation/gameRouter";
 import { turnRouter } from "./presentation/turnRouter";
 import { meRouter } from "./presentation/meRouter";
 import { attachPlayer } from "./presentation/middleware/identity";
+import { csrfProtection } from "./presentation/middleware/csrfProtection";
 import { errorHandler } from "./presentation/errorHandler";
 
 const PORT = 3000;
@@ -16,6 +17,7 @@ app.use(morgan("dev"));
 app.use(express.static("static", { extensions: ["html"] }));
 app.use(express.json());
 app.use(cookieParser());
+app.use("/api", csrfProtection);
 app.use("/api", attachPlayer);
 
 app.use(gameRouter);
