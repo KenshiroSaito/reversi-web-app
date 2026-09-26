@@ -760,7 +760,7 @@ pattern.
    Every turn stores 64 square rows (≈ 6.5 KB), so 1 GB holds about 2,500
    finished games, and moves (not bounded by the §10 caps) can fill it in
    about 13 hours from one IP. Phase 1 ships with this limit; the storage
-   phase that follows it removes the cause (§17.1).
+   phase that follows it removes the cause (§17.2).
 2. **Migration order.** Migrate `reversi_preview` before a preview deploy
    and `reversi` before the production deploy. A missed migration now
    fails with a clear 503 and log line instead of 500s.

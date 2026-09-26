@@ -50,6 +50,12 @@ Once the container is up, load the DDL to create the tables:
 
 > This script pipes the contents of `mysql/init.sql` into the MySQL container.
 
+### 3b. Apply migrations
+
+```bash
+npm run migrate -- --database reversi
+```
+
 ### 4. Start the application
 
 ```bash
@@ -88,12 +94,28 @@ docker-compose down
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET`  | `/api/games` | Get the list of recent games |
-| `POST` | `/api/games` | Start a new game |
-| `GET`  | `/api/games/latest/turns/:turnCount` | Get the board for a given turn of the latest game |
-| `POST` | `/api/games/latest/turns` | Register a move and the next turn in the latest game |
+| `GET`  | `/api/me` | The current guest's display name (404 if this browser has no player yet) |
+| `POST` | `/api/games` | Start a local game (creates a guest and its cookie if needed) |
+| `GET`  | `/api/games` | The current player's recent games |
+| `GET`  | `/api/games/:gameId` | The game's current state (participants only) |
+| `POST` | `/api/games/:gameId/turns` | Make a move: `{ "turnCount": n, "move": { "x": 0-7, "y": 0-7 } }` |
+
+POST requests must send `X-Requested-With: reversi` (CSRF protection).
 
 See [docs/openapi.yaml](docs/openapi.yaml) for the full API specification.
+
+## Tests
+
+```bash
+npm test                  # unit tests
+npm run test:integration  # needs the Docker MySQL; uses the reversi_test database
+npx playwright install chromium   # once
+npm run test:e2e          # browser tests; starts the app on port 3000 against reversi_test
+```
+
+The integration and e2e suites read the Docker settings from `.env`
+(including `DB_ROOT_PASSWORD` and `IP_HASH_SECRET`; copy `.env.example`).
+Both rebuild `reversi_test`, so run them one after the other.
 
 ## Project Structure
 

@@ -1,109 +1,225 @@
 openapi: '3.0.3'
 
-info: 
-  title: udemy-reversi-webapp
-  version: 1.0.0
+info:
+  title: reversi-web-app
+  version: 2.0.0
+  description: >
+    Guests are identified by an httpOnly cookie set by POST /api/games.
+    Every POST must send `X-Requested-With: reversi` and a same-origin
+    `Origin` header, or it is rejected with 403.
 
-paths: 
-  /api/games: 
-    get: 
-      responses: 
-        200: 
-          description: OK
-          content: 
-            application/json: 
-              schema: 
-                type: object
-                properties: 
-                  games: 
-                    type: array
-                    items: 
-                      type: object
-                      properties: 
-                        id: 
-                          type: integer
-                          example: 1
-                        darkMoveCount: 
-                          type: integer
-                          example: 1
-                        lightMoveCount: 
-                          type: integer
-                          example: 1
-                        winnerDisc: 
-                          type: integer
-                          example: 1
-                        startedAt: 
-                          type: string
-                          example: 2017-07-21T17:32:28Z
-                        endAt: 
-                          type: string
-                          example: 2017-07-21T17:32:28Z
-    post: 
-      responses: 
-        201: 
-          description: Created
-
-  /api/games/latest/turns/{turnCount}: 
-    parameters: 
-      - name: turnCount
-        in: path
-        schema: 
+components:
+  schemas:
+    Error:
+      type: object
+      required: [type, message]
+      properties:
+        type:
+          type: string
+          example: GameNotFound
+        message:
+          type: string
+    GameState:
+      type: object
+      required: [id, turnCount, board, nextDisc, winnerDisc, yourDiscs]
+      properties:
+        id:
           type: integer
-        required: true
-    get: 
-      responses: 
+          example: 42
+        turnCount:
+          type: integer
+          example: 1
+        board:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+              enum: [0, 1, 2]
+          example:
+            [
+              [0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 1, 0, 0, 0],
+              [0, 0, 0, 1, 1, 0, 0, 0],
+              [0, 0, 0, 2, 1, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0],
+            ]
+        nextDisc:
+          type: integer
+          nullable: true
+          enum: [1, 2]
+          description: null once the game has ended
+        winnerDisc:
+          type: integer
+          nullable: true
+          enum: [0, 1, 2]
+          description: null until the game has ended; 0 = draw
+        yourDiscs:
+          type: array
+          items:
+            type: integer
+            enum: [1, 2]
+          example: [1, 2]
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    GameId:
+      name: gameId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 2147483647
+
+paths:
+  /api/me:
+    get:
+      responses:
         200:
           description: OK
-          content: 
-            application/json: 
-              schema: 
+          content:
+            application/json:
+              schema:
                 type: object
-                properties: 
-                  turnCount: 
-                    type: integer
-                    example: 1
-                  board: 
-                    type: array
-                    example: 
-                      [
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 1, 2, 0, 0, 0],
-                        [0, 0, 0, 2, 1, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                      ]
-                  nextDisc: 
-                    type: integer
-                    example: 1
-                  winnerDisc: 
-                    type: integer
+                properties:
+                  displayName:
+                    type: string
+                    example: Guest 4821
+        404:
+          $ref: '#/components/responses/Error'
 
-  /api/games/latest/turns: 
-    post: 
-      requestBody: 
-        content: 
-          application/json:
-            schema: 
-              type: object
-              properties: 
-                turnCount: 
-                  type: integer
-                  example: 1
-                move: 
-                  type: object
-                  properties: 
-                    disc: 
-                      type: integer
-                      example: 1
-                    x: 
-                      type: integer
-                      example: 1
-                    y: 
-                      type: integer
-                      example: 1
-      responses: 
-        201: 
+  /api/games:
+    get:
+      description: The current player's 10 most recent games (empty without a cookie).
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  games:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        darkMoveCount:
+                          type: integer
+                          example: 1
+                        lightMoveCount:
+                          type: integer
+                          example: 1
+                        winnerDisc:
+                          type: integer
+                          nullable: true
+                          example: 1
+                        startedAt:
+                          type: string
+                          example: 2017-07-21T17:32:28Z
+                        endAt:
+                          type: string
+                          example: 2017-07-21T17:32:28Z
+    post:
+      description: Starts a local game (one player on both colours), creating a guest and its cookie if needed.
+      responses:
+        201:
           description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /api/games/42
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 42
+        403:
+          $ref: '#/components/responses/Error'
+        429:
+          $ref: '#/components/responses/Error'
+        503:
+          $ref: '#/components/responses/Error'
+
+  /api/games/{gameId}:
+    parameters:
+      - $ref: '#/components/parameters/GameId'
+    get:
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameState'
+        400:
+          $ref: '#/components/responses/Error'
+        404:
+          $ref: '#/components/responses/Error'
+
+  /api/games/{gameId}/turns:
+    parameters:
+      - $ref: '#/components/parameters/GameId'
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [turnCount, move]
+              properties:
+                turnCount:
+                  type: integer
+                  minimum: 1
+                  description: The turn this move creates (current turnCount + 1)
+                  example: 1
+                move:
+                  type: object
+                  required: [x, y]
+                  properties:
+                    x:
+                      type: integer
+                      minimum: 0
+                      maximum: 7
+                      example: 4
+                    y:
+                      type: integer
+                      minimum: 0
+                      maximum: 7
+                      example: 2
+      responses:
+        201:
+          description: Created; the new state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameState'
+        400:
+          $ref: '#/components/responses/Error'
+        403:
+          $ref: '#/components/responses/Error'
+        404:
+          $ref: '#/components/responses/Error'
+        409:
+          description: NotYourTurn, StaleTurn, or GameAlreadyEnded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

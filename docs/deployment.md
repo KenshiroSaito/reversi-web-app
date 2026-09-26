@@ -37,6 +37,8 @@ mysql --host=<host> --port=<port> --user=avnadmin --password \
   --ssl-mode=VERIFY_CA --ssl-ca=ca.pem < mysql/init.sql
 ```
 
+Then apply the migrations (section 7).
+
 ## 4. Create the Vercel project
 
 1. Import the Git repository in Vercel.
@@ -58,7 +60,8 @@ only**. Preview deployments get their own values; see section 6.
 | `DB_PASSWORD` | Its password |
 | `DB_NAME` | `reversi` |
 | `DB_CA_CERT` | Full contents of `ca.pem`, including the `BEGIN`/`END` lines |
-| `DB_POOL_MAX` | Optional, default `3` (see section 7) |
+| `DB_POOL_MAX` | Optional, default `3` (see section 9) |
+| `IP_HASH_SECRET` | At least 32 random characters (`openssl rand -base64 48`); used to hash client IPs for the new-guest cap. Use a different value per environment |
 
 The app refuses to connect on Vercel without `DB_CA_CERT`, and verifies the
 server certificate against it. A missing variable is reported by name in the
@@ -70,19 +73,9 @@ Every push to a non-production branch (for example a `feat/phase-N-*` branch)
 creates a Preview deployment. Feature branches can change the schema, so a
 preview must never point at the production database.
 
-In Vercel, each environment variable is assigned to one or more environments
-(Production, Preview, Development). Add every `DB_*` variable **twice**:
-
-- once scoped to **Production**, with the production database's values;
-- once scoped to **Preview**, with a separate preview database's values.
-
-Never tick Preview on a production value. If a `DB_*` variable is missing from
-the Preview scope, preview deployments fail with `Missing required environment
-variable` rather than silently falling back to production.
-
-For the preview database, use a second Aiven service if your plan allows it
-(it can then keep the database name `reversi`). Otherwise create a second
-database on the same service and load the schema into it under its own name:
+Aiven's free tier allows **one** MySQL service, so previews use a second
+database, `reversi_preview`, on the same service. This is the intended setup,
+not a fallback. Load the schema into it under its own name:
 
 ```bash
 sed -e 's/ reversi;/ reversi_preview;/' mysql/init.sql | \
@@ -90,11 +83,57 @@ sed -e 's/ reversi;/ reversi_preview;/' mysql/init.sql | \
     --ssl-mode=VERIFY_CA --ssl-ca=ca.pem
 ```
 
-and set the Preview-scoped `DB_NAME` to `reversi_preview`. Two databases on
-one service share its `max_connections`, so size `DB_POOL_MAX` for both
-(section 7).
+In Vercel, each environment variable is assigned to one or more environments
+(Production, Preview, Development). Add every `DB_*` variable and
+`IP_HASH_SECRET` **twice**:
 
-## 7. Sizing the connection pool
+- once scoped to **Production**, with `DB_NAME=reversi`;
+- once scoped to **Preview**, with `DB_NAME=reversi_preview`.
+
+Never tick Preview on a production value. If a variable is missing from the
+Preview scope, preview deployments fail with `Missing required environment
+variable` rather than silently falling back to production.
+
+Both databases share the service's 76 connections, so the pool budget in
+section 9 covers production and preview instances together.
+
+## 7. Migrations (before every deploy)
+
+Schema changes are versioned in `src/infrastructure/migration/migrations.ts`
+and recorded in each database's `schema_migrations` table. Apply them by hand
+**before** deploying code that needs them — to `reversi_preview` before a
+preview deploy, and to `reversi` before a production deploy:
+
+```bash
+npm run migrate -- --env-file .env.preview --database reversi_preview
+```
+
+The env file holds that environment's `DB_*` values, including `DB_CA_CERT`
+(`.env.*` files are gitignored). Without `--env-file`, the command reads the
+local `.env`. Variables already set in your shell take precedence over the
+file, so make sure no `DB_*` variables are exported when you run it. The
+command prints the target host and database first, and refuses to run if
+`--database` does not match `DB_NAME`, or if a remote host is used without
+`DB_CA_CERT`. Migrations only add to the schema, so the currently deployed
+code keeps working while they are applied.
+
+If code is deployed before its migrations, API requests return 503 and the
+function logs contain a line like:
+
+```
+Request failed: {"method":"POST","path":"/api/games","error":{"name":"SchemaOutOfDateError","message":"Database schema is missing migrations: 001_create_players_and_game_players. Run `npm run migrate` against this database."}}
+```
+
+## 8. Firewall rate limit
+
+Add one rate-limit rule in **Firewall → Configure → New Rule** (Hobby allows
+one): if the request path starts with `/api/`, rate limit with a fixed window
+of **60 s** and **300 requests** per **IP**, action **Default (429)**.
+Blocked requests never reach the function, so they do not count towards the
+monthly invocation limit. The app additionally caps new guests at 20 per IP
+(per /64 for IPv6) per hour and new games at 10 per player per hour.
+
+## 9. Sizing the connection pool
 
 Each function instance keeps at most `DB_POOL_MAX` connections and closes them
 after about 5 seconds without use, before the instance is suspended. The
@@ -109,13 +148,21 @@ raise it; if Aiven reports too many connections, lower it. Avoid 1 in
 production: it serialises concurrent requests on an instance without reducing
 the total number of connections.
 
-## 8. Verify the deployment
+On the free tier, `max_connections` is 76 and is shared by `reversi` and
+`reversi_preview`; with `DB_POOL_MAX=3`, keep the total number of concurrent
+instances across both environments under about 23.
+
+## 10. Verify the deployment
 
 1. Open the site; the home page and `/game/` load (served by the CDN).
 2. Start a match and place a few stones.
 3. Return home; the game appears in the history table.
 4. In the function logs, check there are no `Missing required environment
    variable` or TLS errors.
+5. If the API returns 503, open the function logs: `ECONNREFUSED`,
+   `ETIMEDOUT`, or `ENOTFOUND` means the database is unreachable (an idle
+   Aiven free-tier service powers off; power it on in the Aiven console);
+   `SchemaOutOfDateError` means migrations are missing (section 7).
 
 ## Local development
 
