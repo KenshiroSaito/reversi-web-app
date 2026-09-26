@@ -30,8 +30,12 @@ async function main() {
     gameId = (await response.json()).id;
     // Keep the game in the URL so a reload resumes it instead of starting a new one.
     history.replaceState(null, "", `/game/?id=${gameId}`);
-  } else {
+  } else if (/^[1-9][0-9]*$/.test(idParam)) {
     gameId = idParam;
+  } else {
+    // Not a game ID at all (for example a truncated link): nothing to load.
+    showErrorForStatus(404);
+    return;
   }
 
   await refreshState();
@@ -40,7 +44,8 @@ async function main() {
 async function refreshState() {
   const response = await fetch(`/api/games/${encodeURIComponent(gameId)}`);
   if (!response.ok) {
-    showErrorForStatus(response.status);
+    // 400 means the ID is out of range; for the player that is "not found".
+    showErrorForStatus(response.status === 400 ? 404 : response.status);
     return;
   }
   render(await response.json(), undefined);
