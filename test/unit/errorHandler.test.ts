@@ -71,6 +71,24 @@ describe("errorHandler", () => {
     });
   });
 
+  it("maps other client-caused request errors to their 4xx status without logging", () => {
+    // Express rejects an undecodable path parameter (%E0) with status 400 but no `expose`.
+    const badPath = Object.assign(new URIError("Failed to decode param '%E0'"), { status: 400, statusCode: 400 });
+    const tooLarge = Object.assign(new Error("request entity too large"), { type: "entity.too.large", status: 413, expose: true });
+    const badCharset = Object.assign(new Error("unsupported charset"), { type: "charset.unsupported", status: 415, expose: true });
+
+    expect(run(badPath)).toEqual({ statusCode: 400, body: { type: "InvalidRequest", message: "Invalid request" } });
+    expect(run(tooLarge)).toEqual({
+      statusCode: 413,
+      body: { type: "InvalidRequest", message: "Request body is too large" },
+    });
+    expect(run(badCharset)).toEqual({
+      statusCode: 415,
+      body: { type: "InvalidRequest", message: "Unsupported request body encoding" },
+    });
+    expect(logged).toBe("");
+  });
+
   it("returns 503 and logs the missing migrations", () => {
     const response = run(new SchemaOutOfDateError(["001_create_players_and_game_players"]));
 

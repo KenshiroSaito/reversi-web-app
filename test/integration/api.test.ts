@@ -127,6 +127,17 @@ describe("GET /api/games/:gameId", () => {
     expect((await owner.get(`/api/games/${inserted.insertId}`)).body.type).toBe("GameNotFound");
   });
 
+  it("rejects an undecodable game ID with 400 on both game routes", async () => {
+    const guest = new Guest(server);
+    await startGame(guest);
+
+    const read = await guest.get("/api/games/%E0");
+    const move = await guest.post("/api/games/%E0/turns", { turnCount: 1, move: { x: 4, y: 2 } });
+
+    expect([read.status, read.body.type]).toEqual([400, "InvalidRequest"]);
+    expect([move.status, move.body.type]).toEqual([400, "InvalidRequest"]);
+  });
+
   it.each(["01", "1e3", "-1", "2147483648", "abc"])("rejects the ID %s with 400", async (id) => {
     const guest = new Guest(server);
     await startGame(guest);

@@ -38,8 +38,9 @@ export function errorHandler(
     return;
   }
 
-  if (isClientBodyError(err)) {
-    res.status(400).json({ type: "InvalidRequest", message: "Request body is not valid JSON" });
+  const clientStatus = clientErrorStatus(err);
+  if (clientStatus !== undefined) {
+    res.status(clientStatus).json({ type: "InvalidRequest", message: clientErrorMessage(err, clientStatus) });
     return;
   }
 
@@ -53,17 +54,26 @@ export function errorHandler(
   res.status(500).send({ message: "Unexpected Error occured" });
 }
 
-// body-parser marks errors caused by the request body (malformed JSON, too
-// large) with `expose` and a 4xx `status`.
-function isClientBodyError(err: any): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    err.expose === true &&
-    typeof err.status === "number" &&
-    err.status >= 400 &&
-    err.status < 500
-  );
+// Errors caused by the request itself carry a 4xx `status`: body-parser's
+// (malformed JSON, too large, bad charset) and Express's own (a path
+// parameter that is not valid percent-encoding). Our own errors and mysql2's
+// never set one.
+function clientErrorStatus(err: any): number | undefined {
+  const status = typeof err === "object" && err !== null ? err.status ?? err.statusCode : undefined;
+  return typeof status === "number" && status >= 400 && status < 500 ? status : undefined;
+}
+
+function clientErrorMessage(err: any, status: number): string {
+  if (err.type === "entity.parse.failed") {
+    return "Request body is not valid JSON";
+  }
+  if (status === 413) {
+    return "Request body is too large";
+  }
+  if (status === 415) {
+    return "Unsupported request body encoding";
+  }
+  return "Invalid request";
 }
 
 // One JSON line so nested causes are not truncated by the log viewer.
