@@ -10,6 +10,11 @@ export const APPLICATION_ERROR_STATUS: Record<ApplicationErrorType, number> = {
   LatestGameNotFound: 404,
   PlayerNotFound: 404,
   GuestCreationLimitReached: 429,
+  GameNotFound: 404,
+  NotYourTurn: 409,
+  StaleTurn: 409,
+  GameAlreadyEnded: 409,
+  GameCreationLimitReached: 429,
 };
 
 export function errorHandler(
