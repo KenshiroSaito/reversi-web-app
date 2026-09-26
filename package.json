@@ -6,7 +6,8 @@
   "scripts": {
     "start": "nodemon",
     "test": "vitest run --project unit",
-    "test:integration": "vitest run --project integration"
+    "test:integration": "vitest run --project integration",
+    "migrate": "node -r ts-node/register src/infrastructure/migration/migrateCli.ts"
   },
   "author": "",
   "license": "ISC",

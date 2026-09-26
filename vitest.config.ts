@@ -20,6 +20,7 @@ export default defineConfig({
           name: "integration",
           include: ["test/integration/**/*.test.ts"],
           globalSetup: ["test/integration/globalSetup.ts"],
+          setupFiles: ["test/integration/setup.ts"],
           // A dedicated database keeps the developer's data untouched, and a
           // single-connection pool turns any leaked connection into a hang,
           // which the test timeout reports as a failure.
