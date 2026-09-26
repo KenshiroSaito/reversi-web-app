@@ -1,4 +1,7 @@
-export type ApplicationErrorType = "LatestGameNotFound";
+export type ApplicationErrorType =
+  | "LatestGameNotFound"
+  | "PlayerNotFound"
+  | "GuestCreationLimitReached";
 
 export class ApplicationError extends Error {
   constructor(

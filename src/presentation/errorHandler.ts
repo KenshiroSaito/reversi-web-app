@@ -8,6 +8,8 @@ import { describeError } from "./errorLogging";
 // Every ApplicationError type must have a status; the compiler enforces it.
 export const APPLICATION_ERROR_STATUS: Record<ApplicationErrorType, number> = {
   LatestGameNotFound: 404,
+  PlayerNotFound: 404,
+  GuestCreationLimitReached: 429,
 };
 
 export function errorHandler(
