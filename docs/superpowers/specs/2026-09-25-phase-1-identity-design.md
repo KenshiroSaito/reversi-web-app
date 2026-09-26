@@ -208,8 +208,11 @@ and repeat visits do not grow the `players` table.
 
 - IP source: `x-real-ip` on Vercel (`VERCEL` is set), otherwise the socket's
   remote address. Forwarding headers are never trusted outside Vercel.
-- `created_ip_hash = HMAC-SHA-256(IP_HASH_SECRET, ip)`; the raw IP is never
-  stored.
+- `created_ip_hash = HMAC-SHA-256(IP_HASH_SECRET, key)`; the raw IP is never
+  stored. The key is the IPv4 address, or for IPv6 its /64 prefix (a host
+  normally owns a whole /64 and could otherwise rotate addresses to dodge the
+  cap); an IPv4-mapped IPv6 address counts as its IPv4 address. (Added at the
+  Task 8 checkpoint review.)
 - `IP_HASH_SECRET` is required; on Vercel it must be at least 32
   characters. Errors name the variable, never its value. It is read on first
   guest creation, so a missing secret fails that request (logged, 500)
