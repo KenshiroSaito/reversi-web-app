@@ -4,10 +4,10 @@ import { ApplicationError, ApplicationErrorType } from "../application/error/app
 import { SchemaOutOfDateError } from "../infrastructure/migration/schemaCheck";
 import { isDatabaseUnavailable } from "../infrastructure/databaseAvailability";
 import { describeError } from "./errorLogging";
+import { ValidationError } from "./validation";
 
 // Every ApplicationError type must have a status; the compiler enforces it.
 export const APPLICATION_ERROR_STATUS: Record<ApplicationErrorType, number> = {
-  LatestGameNotFound: 404,
   PlayerNotFound: 404,
   GuestCreationLimitReached: 429,
   GameNotFound: 404,
@@ -25,6 +25,11 @@ export function errorHandler(
 ) {
   if (err instanceof DomainError) {
     res.status(400).json({ type: err.type, message: err.message });
+    return;
+  }
+
+  if (err instanceof ValidationError) {
+    res.status(400).json({ type: "InvalidRequest", message: err.message });
     return;
   }
 

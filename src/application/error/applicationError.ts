@@ -1,5 +1,4 @@
 export type ApplicationErrorType =
-  | "LatestGameNotFound"
   | "PlayerNotFound"
   | "GuestCreationLimitReached"
   | "GameNotFound"

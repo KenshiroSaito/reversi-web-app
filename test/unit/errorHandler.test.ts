@@ -54,7 +54,9 @@ describe("errorHandler", () => {
   });
 
   it("maps ApplicationError by type", () => {
-    expect(run(new ApplicationError("LatestGameNotFound", "Latest game not found")).statusCode).toBe(404);
+    expect(run(new ApplicationError("GameNotFound", "Game not found")).statusCode).toBe(404);
+    expect(run(new ApplicationError("StaleTurn", "stale")).statusCode).toBe(409);
+    expect(run(new ApplicationError("GameCreationLimitReached", "slow down")).statusCode).toBe(429);
   });
 
   it("maps body-parser client errors to 400 InvalidRequest", () => {

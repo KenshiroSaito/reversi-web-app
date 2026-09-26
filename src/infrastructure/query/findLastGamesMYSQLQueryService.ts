@@ -9,6 +9,7 @@ export class FindLastGameMySQLQueryService
 {
   async query(
     conn: mysql.Connection,
+    playerId: number,
     limit: number
   ): Promise<FindLastGamesQueryModel[]> {
     const selectResult = await conn.execute<mysql.RowDataPacket[]>(
@@ -24,11 +25,12 @@ from games g
 left join game_results gr on gr.game_id = g.id
 left join turns t on t.game_id = g.id
 left join moves m on m.turn_id = t.id
+where g.id in (select game_id from game_players where player_id = ?)
 group by g.id
 order by g.id desc
 limit ?
 `,
-      [limit.toString()]
+      [playerId, limit.toString()]
     )
     const records = selectResult[0]
 

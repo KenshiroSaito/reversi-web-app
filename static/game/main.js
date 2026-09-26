@@ -6,26 +6,57 @@ const WINNER_DRAW = 0;
 const WINNER_DARK = 1;
 const WINNER_LIGHT = 2;
 
+// Sent on every POST: the server rejects state-changing requests without it (CSRF).
+const POST_HEADERS = {
+  "Content-Type": "application/json",
+  "X-Requested-With": "reversi",
+};
+
 const boardElement = document.getElementById("board");
 const nextDiscMessageElement = document.getElementById("next-disc-message");
 const warningMessageElement = document.getElementById("warning-message");
 
-async function showBoard(turnCount, previousDisc) {
-  const response = await fetch(`/api/games/latest/turns/${turnCount}`);
-  const responseBody = await response.json();
-  const board = responseBody.board;
-  const nextDisc = responseBody.nextDisc;
-  const winnerDisc = responseBody.winnerDisc;
+let gameId;
+let currentState;
 
-  showWarningMessage(previousDisc, nextDisc, winnerDisc);
+async function main() {
+  const idParam = new URLSearchParams(location.search).get("id");
+  if (idParam === null) {
+    const response = await fetch("/api/games", { method: "POST", headers: POST_HEADERS });
+    if (!response.ok) {
+      showErrorForStatus(response.status);
+      return;
+    }
+    gameId = (await response.json()).id;
+    // Keep the game in the URL so a reload resumes it instead of starting a new one.
+    history.replaceState(null, "", `/game/?id=${gameId}`);
+  } else {
+    gameId = idParam;
+  }
 
-  showNextDiscMessage(nextDisc);
+  await refreshState();
+}
+
+async function refreshState() {
+  const response = await fetch(`/api/games/${encodeURIComponent(gameId)}`);
+  if (!response.ok) {
+    showErrorForStatus(response.status);
+    return;
+  }
+  render(await response.json(), undefined);
+}
+
+function render(state, previousDisc) {
+  currentState = state;
+
+  showWarningMessage(previousDisc, state.nextDisc, state.winnerDisc);
+  showNextDiscMessage(state.nextDisc);
 
   while (boardElement.firstChild) {
     boardElement.removeChild(boardElement.firstChild);
   }
 
-  board.forEach((line, y) => {
+  state.board.forEach((line, y) => {
     line.forEach((square, x) => {
       const squareElement = document.createElement("div");
       squareElement.className = "square";
@@ -36,26 +67,33 @@ async function showBoard(turnCount, previousDisc) {
         stoneElement.className = `stone ${color}`;
 
         squareElement.appendChild(stoneElement);
-      } else {
-        squareElement.addEventListener("click", async () => {
-          const nextTurnCount = turnCount + 1;
-          const registerTurnResponse = await registerTurn(
-            nextTurnCount,
-            nextDisc,
-            x,
-            y,
-          );
-          if (registerTurnResponse.ok) {
-            await showBoard(nextTurnCount, nextDisc);
-          } else {
-            showCannotPlaceMessage(nextDisc);
-          }
-        });
+      } else if (state.nextDisc !== null) {
+        squareElement.addEventListener("click", () => registerMove(x, y));
       }
 
       boardElement.appendChild(squareElement);
     });
   });
+}
+
+async function registerMove(x, y) {
+  const previousDisc = currentState.nextDisc;
+  const response = await fetch(`/api/games/${encodeURIComponent(gameId)}/turns`, {
+    method: "POST",
+    headers: POST_HEADERS,
+    body: JSON.stringify({ turnCount: currentState.turnCount + 1, move: { x, y } }),
+  });
+
+  if (response.status === 201) {
+    render(await response.json(), previousDisc);
+  } else if (response.status === 400) {
+    showCannotPlaceMessage();
+  } else if (response.status === 409) {
+    // The board is out of date (another tab moved, or the game ended): reload it.
+    await refreshState();
+  } else {
+    showErrorForStatus(response.status);
+  }
 }
 
 function discToString(disc) {
@@ -127,34 +165,19 @@ function showCannotPlaceMessage() {
   nextDiscMessageElement.style.background = "#fffc63";
 }
 
-async function registerGame() {
-  await fetch("/api/games", {
-    method: "POST",
-  });
-}
-
-async function registerTurn(turnCount, disc, x, y) {
-  const requestBody = {
-    turnCount,
-    move: {
-      disc,
-      x,
-      y,
-    },
+function showErrorForStatus(status) {
+  const messages = {
+    404: "Game not found",
+    429: "Too many new games — try again later",
+    503: "The server is temporarily unavailable",
   };
 
-  return await fetch("/api/games/latest/turns", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
-}
-
-async function main() {
-  await registerGame();
-  await showBoard(0);
+  while (boardElement.firstChild) {
+    boardElement.removeChild(boardElement.firstChild);
+  }
+  warningMessageElement.style.display = "none";
+  nextDiscMessageElement.innerText = messages[status] ?? "Something went wrong";
+  nextDiscMessageElement.style.background = "#fffc63";
 }
 
 main();

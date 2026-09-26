@@ -1,31 +1,28 @@
-import { createServer, Server } from "node:http";
-import { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import handler from "../../api/index";
 import { closePool } from "../../src/infrastructure/connection";
+import { Guest, startTestServer, TestServer } from "./apiClient";
 
-let server: Server;
-let baseUrl: string;
+let server: TestServer;
 
 beforeAll(async () => {
-  server = createServer(handler);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  server = await startTestServer(handler);
 });
 
 afterAll(async () => {
-  await new Promise((resolve) => server.close(resolve));
+  await server.close();
   await closePool();
 });
 
 describe("Vercel entry point", () => {
   it("serves the API through the default export", async () => {
-    const created = await fetch(`${baseUrl}/api/games`, { method: "POST" });
+    const guest = new Guest(server);
+
+    const created = await guest.post("/api/games");
     expect(created.status).toBe(201);
 
-    const listed = await fetch(`${baseUrl}/api/games`);
+    const listed = await guest.get("/api/games");
     expect(listed.status).toBe(200);
-    const body = (await listed.json()) as { games: unknown[] };
-    expect(body.games.length).toBeGreaterThan(0);
+    expect(listed.body.games.length).toBeGreaterThan(0);
   });
 });

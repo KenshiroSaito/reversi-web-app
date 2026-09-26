@@ -1,70 +1,35 @@
 import express from "express";
-import { Point } from "../domain/model/turn/point";
-import { toDisc } from "../domain/model/turn/disc";
+import { RegisterMoveUseCase } from "../application/useCase/registerMoveUseCase";
+import { gameNotFound } from "../application/useCase/findGameStateUseCase";
 import { TurnMYSQLRepository } from "../infrastructure/repository/turn/turnMYSQLRepository";
-import { GameMYSQLRepository } from "../infrastructure/repository/game/gameMYSQLRepository";
 import { GameResultMYSQLRepository } from "../infrastructure/repository/gameResult/gameResultMYSQLRepository";
-import { RegisterTurnUseCase } from "../application/useCase/registerTurnUseCase";
-import { FindLatestGameTurnByTurnCountUseCase } from "../application/useCase/findLatestGameTurnByTurnCountUseCase";
+import { GameSeatsMYSQLRepository } from "../infrastructure/repository/gamePlayer/gameSeatsMYSQLRepository";
+import { LatestTurnMySQLQueryService } from "../infrastructure/query/latestTurnMYSQLQueryService";
+import { currentPlayer } from "./middleware/identity";
+import { parseGameId, parseMoveRequest } from "./validation";
+import { GameStateResponseBody, toGameStateResponse } from "./gameStateResponse";
 
 export const turnRouter = express.Router();
 
-const findLatestGameTurnByTurnCountUseCase = new FindLatestGameTurnByTurnCountUseCase(
+const registerMoveUseCase = new RegisterMoveUseCase(
   new TurnMYSQLRepository(),
-  new GameMYSQLRepository(),
   new GameResultMYSQLRepository(),
+  new GameSeatsMYSQLRepository(),
+  new LatestTurnMySQLQueryService(),
 );
-
-const registerTurnUseCase = new RegisterTurnUseCase(
-  new TurnMYSQLRepository(),
-  new GameMYSQLRepository(),
-  new GameResultMYSQLRepository(),
-);
-
-interface TurnGetResponseBody {
-  turnCount: number;
-  board: number[][];
-  nextDisc: number | null;
-  winnerDisc: number | null;
-}
-
-turnRouter.get(
-  "/api/games/latest/turns/:turnCount",
-  async (req, res: express.Response<TurnGetResponseBody>) => {
-    const turnCount = parseInt(req.params.turnCount);
-
-    const output =
-      await findLatestGameTurnByTurnCountUseCase.run(turnCount);
-
-    const responseBody = {
-      turnCount: output.turnCount,
-      board: output.board,
-      nextDisc: output.nextDisc ?? null,
-      winnerDisc: output.winnerDisc ?? null,
-    };
-
-    res.json(responseBody);
-  },
-);
-
-interface TurnPostRequestBody {
-  turnCount: number;
-  move: {
-    disc: number;
-    x: number;
-    y: number;
-  };
-}
 
 turnRouter.post(
-  "/api/games/latest/turns",
-  async (req: express.Request<{}, {}, TurnPostRequestBody>, res) => {
-    const turnCount = req.body.turnCount;
-    const disc = toDisc(req.body.move.disc);
-    const point = new Point(req.body.move.x, req.body.move.y);
+  "/api/games/:gameId/turns",
+  async (req, res: express.Response<GameStateResponseBody>) => {
+    const gameId = parseGameId(req.params.gameId);
+    const { turnCount, point } = parseMoveRequest(req.body);
+    const player = currentPlayer(res);
+    if (!player) {
+      throw gameNotFound();
+    }
 
-    await registerTurnUseCase.run(turnCount, disc, point);
+    const state = await registerMoveUseCase.run(gameId, player.id, turnCount, point);
 
-    res.status(201).end();
+    res.status(201).json(toGameStateResponse(state));
   },
 );
