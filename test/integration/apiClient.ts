@@ -75,8 +75,7 @@ export class Guest {
       body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
     });
 
-    // Node 24 has Headers.getSetCookie(); TypeScript 4.8's DOM typings predate it.
-    const setCookie = (response.headers as Headers & { getSetCookie(): string[] }).getSetCookie()[0];
+    const setCookie = response.headers.getSetCookie()[0];
     if (setCookie) {
       this.cookie = setCookie.split(";")[0];
     }

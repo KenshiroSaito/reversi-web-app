@@ -101,11 +101,22 @@ section 9 covers production and preview instances together.
 
 Schema changes are versioned in `src/infrastructure/migration/migrations.ts`
 and recorded in each database's `schema_migrations` table. Apply them by hand
-**before** deploying code that needs them — to `reversi_preview` before a
-preview deploy, and to `reversi` before a production deploy:
+**before** the code that needs them is deployed. Merging into `main` deploys
+production, so production is migrated **before the merge**, not after:
+
+1. Migrate `reversi_preview` and set any new Preview-scoped variables.
+2. Push the branch and check the preview deployment.
+3. Migrate `reversi` and set any new Production-scoped variables (for
+   Phase 1: `IP_HASH_SECRET`).
+4. Merge into `main`.
+
+Step 3 is safe while the old code is still live, because migrations only add
+to the schema. Merging first would make production return 503 until the
+migration runs.
 
 ```bash
 npm run migrate -- --env-file .env.preview --database reversi_preview
+npm run migrate -- --env-file .env.production --database reversi
 ```
 
 The env file holds that environment's `DB_*` values, including `DB_CA_CERT`

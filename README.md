@@ -12,14 +12,14 @@ A browser-based Reversi (Othello) game. Built with TypeScript and Express, it pe
 ## Tech Stack
 
 - **Language**: TypeScript
-- **Server**: Node.js 16.17.1 / Express
+- **Server**: Node.js 24 / Express
 - **Database**: MySQL 8.0
 - **Frontend**: Plain HTML / CSS / JavaScript (under `static/`)
 - **Runtime**: Docker Compose (for MySQL)
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 16.17.1 (declared in `.tool-versions`; works out of the box if you use a version manager such as [asdf](https://asdf-vm.com/))
+- [Node.js](https://nodejs.org/) 24 (24.21.0 is declared in `.tool-versions`; works out of the box if you use a version manager such as [asdf](https://asdf-vm.com/))
 - [Docker](https://www.docker.com/) / Docker Compose
 
 ## Setup
@@ -31,6 +31,15 @@ git clone <this-repository-url>
 cd reversi-web-app
 npm install
 ```
+
+Then create your local settings file:
+
+```bash
+cp .env.example .env
+```
+
+If you already have a `.env` from an earlier version, add `IP_HASH_SECRET` to it
+(see `.env.example`). Without it, starting a match fails with a server error.
 
 ### 2. Start the MySQL container
 

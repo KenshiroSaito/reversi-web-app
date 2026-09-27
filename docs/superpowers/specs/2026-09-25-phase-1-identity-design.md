@@ -807,6 +807,11 @@ should be written once, against the new format.
   The owner leans towards (B), since game history and replay need the move
   list anyway; the choice is made in that phase.
 - Migrate existing data.
+- Game creation on page load (decide here or in Phase 2): opening `/game/`
+  without `?id=` creates a game from script, so a browser prefetch or
+  prerender of `/game/` can create one. Creating data as a side effect of a
+  navigation interacts with storage growth; consider making game creation an
+  explicit POST from a "New game" button.
 
 ### 17.3 Phase 2 (with the daily cron)
 
@@ -821,6 +826,13 @@ should be written once, against the new format.
 - Near the limit, stop creating new games with a clear message while games
   in progress continue. A full disk must never make the whole site return
   500s.
+- Map the missing-player case to a 4xx. `PlayerMYSQLRepository.lockForUpdate`
+  throws a plain `Error` (500) when the player row does not exist. In
+  Phase 1 that is unreachable (players are never deleted), but once the
+  cleanup deletes inactive guests, a browser still holding a deleted guest's
+  cookie can reach it (the cookie resolves before deletion, the lock runs
+  after). Treat it like an unknown player: 404 `PlayerNotFound`, or clear
+  the cookie and start a fresh guest.
 
 ### 17.4 Phase 4
 
